@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0d0d0d">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Calculadora de Compras</title>
+  <link rel="manifest" id="manifest-link">
+  <script>
+    const manifest = {
+      name: "Calculadora de Compras",
+      short_name: "Compras",
+      start_url: "./",
+      display: "standalone",
+      background_color: "#0d0d0d",
+      theme_color: "#0d0d0d",
+      icons: [{
+        src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%230d0d0d'/><text x='96' y='130' font-size='110' text-anchor='middle' fill='%2300e5a0'>₢</text></svg>",
+        sizes: "192x192", type: "image/svg+xml"
+      }]
+    };
+    const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+    document.getElementById('manifest-link').href = URL.createObjectURL(blob);
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0d0d0d;
+      --surface:    #1a1a1a;
+      --surface2:   #212121;
+      --border:     #2e2e2e;
+      --accent:     #00e5a0;
+      --accent-dim: #00c98a;
+      --text:       #f0f0f0;
+      --muted:      #777;
+      --danger:     #ff4d4d;
+      --key-bg:     #252525;
+      --key-active: #333;
+      --mono: 'DM Mono', monospace;
+      --sans: 'Space Grotesk', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 14px 28px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 420px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    header h1 {
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      flex-shrink: 0;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 20px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ── PRICE DISPLAY ── */
+    .price-section { display: flex; flex-direction: column; gap: 6px; }
+
+    .field-label {
+      font-size: 0.68rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .price-display {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .price-display.active { border-color: var(--accent); }
+    .price-display.error  { border-color: var(--danger); }
+
+    .price-prefix {
+      font-family: var(--mono);
+      font-size: 1rem;
+      color: var(--muted);
+    }
+
+    #preco-valor {
+      font-family: var(--mono);
+      font-size: 1.8rem;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: 0.02em;
+      min-width: 4ch;
+      flex: 1;
+    }
+
+    #preco-valor.placeholder { color: var(--border); }
+
+    .cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1.6rem;
+      background: var(--accent);
+      border-radius: 1px;
+      margin-left: 2px;
+      animation: blink 1s step-end infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ── QUANTITY ── */
+    .qty-section { display: flex; flex-direction: column; gap: 6px; }
+
+    .qty-row {
+      display: flex;
+      align-items: center;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+
+    .qty-row.active { border-color: var(--accent); }
+
+    .qty-btn {
+      width: 54px; height: 50px;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-size: 1.5rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.1s;
+      flex-shrink: 0;
+    }
+
+    .qty-btn.minus { border-right: 1px solid var(--border); }
+    .qty-btn.plus  { border-left:  1px solid var(--border); }
+    .qty-btn:active { background: var(--border); }
+
+    #qty-num {
+      flex: 1;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 1.5rem;
+      font-weight: 500;
+      color: var(--text);
+      line-height: 50px;
+      cursor: pointer;
+      transition: color 0.15s;
+      position: relative;
+    }
+
+    .qty-row.active #qty-num { color: var(--accent); }
+
+    /* cursor inside qty when active */
+    #qty-cursor {
+      display: none;
+      width: 2px;
+      height: 1.3rem;
+      background: var(--accent);
+      border-radius: 1px;
+      margin-left: 2px;
+      animation: blink 1s step-end infinite;
+      vertical-align: middle;
+    }
+
+    .qty-row.active #qty-cursor { display: inline-block; }
+
+    /* ── NUMPAD ── */
+    .numpad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .key {
+      height: 46px;
+      background: var(--key-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 1.3rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.08s, transform 0.08s;
+      -webkit-tap-highlight-color: transparent;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .key:active,
+    .key.pressed {
+      background: var(--key-active);
+      transform: scale(0.95);
+    }
+
+    /* comma key dims when editing qty (not applicable) */
+    .key.comma {
+      font-size: 1.6rem;
+      color: var(--muted);
+    }
+
+    .key.comma.disabled {
+      opacity: 0.25;
+      pointer-events: none;
+    }
+
+    .key.back {
+      background: transparent;
+      border-color: transparent;
+      font-size: 1.4rem;
+      color: var(--muted);
+    }
+
+    .key.back:active { color: var(--danger); background: #ff4d4d15; }
+
+    /* ENTER */
+    #btn-ok {
+      width: 100%;
+      padding: 15px;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 12px;
+      font-family: var(--sans);
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    #btn-ok:active { background: var(--accent-dim); transform: scale(0.98); }
+
+    /* ── DIVIDER ── */
+    .divider { height: 1px; background: var(--border); }
+
+    /* ── TOTAL ── */
+    .total-section { display: flex; flex-direction: column; gap: 4px; }
+
+    @keyframes flash {
+      0%   { background: #00e5a022; border-radius: 8px; }
+      100% { background: transparent; }
+    }
+
+    .flash { animation: flash 0.4s ease-out; }
+
+    #total-display {
+      font-family: var(--mono);
+      font-size: 2.2rem;
+      font-weight: 500;
+      color: var(--accent);
+      letter-spacing: 0.02em;
+    }
+
+    #items-count { font-size: 0.75rem; color: var(--muted); font-family: var(--mono); }
+
+    /* ── ACTIONS ── */
+    .actions { display: flex; gap: 10px; }
+
+    #btn-limpar {
+      flex: 1;
+      padding: 12px;
+      background: transparent;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      color: var(--muted);
+      font-family: var(--sans);
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    #btn-limpar:active { border-color: var(--danger); color: var(--danger); }
+
+    #btn-desfazer {
+      padding: 12px 18px;
+      background: transparent;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    #btn-desfazer:active { border-color: var(--accent); color: var(--accent); }
+
+    /* ── HISTORY ── */
+    .history {
+      width: 100%; max-width: 420px;
+      margin-top: 14px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+
+    .history-label {
+      font-size: 0.68rem; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--muted);
+      padding: 0 4px; margin-bottom: 2px;
+    }
+
+    .history-item {
+      display: flex; align-items: center;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--muted);
+      animation: slideIn 0.18s ease-out;
+      gap: 8px;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-5px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .hi-qty { color: var(--text); }
+    .hi-sub { color: var(--accent); margin-left: auto; }
+
+    #history-empty {
+      text-align: center; font-size: 0.75rem;
+      color: var(--border); padding: 10px 0;
+      font-family: var(--mono);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="dot"></div>
+  <h1>Calculadora de Compras</h1>
+</header>
+
+<div class="card">
+
+  <!-- PREÇO -->
+  <div class="price-section">
+    <div class="field-label">Preço do item</div>
+    <div class="price-display active" id="price-display">
+      <span class="price-prefix">R$</span>
+      <span id="preco-valor" class="placeholder">0<span class="cursor"></span></span>
+    </div>
+  </div>
+
+  <!-- QUANTIDADE -->
+  <div class="qty-section">
+    <div class="field-label">Quantidade</div>
+    <div class="qty-row" id="qty-row">
+      <button class="qty-btn minus" id="btn-menos">−</button>
+      <span id="qty-num">1<span id="qty-cursor"></span></span>
+      <button class="qty-btn plus" id="btn-mais">+</button>
+    </div>
+  </div>
+
+  <!-- NUMPAD -->
+  <div class="numpad" id="numpad">
+    <div class="key" data-val="1">1</div>
+    <div class="key" data-val="2">2</div>
+    <div class="key" data-val="3">3</div>
+    <div class="key" data-val="4">4</div>
+    <div class="key" data-val="5">5</div>
+    <div class="key" data-val="6">6</div>
+    <div class="key" data-val="7">7</div>
+    <div class="key" data-val="8">8</div>
+    <div class="key" data-val="9">9</div>
+    <div class="key comma" data-val=",">,</div>
+    <div class="key zero"  data-val="0">0</div>
+    <div class="key back"  data-val="back">⌫</div>
+  </div>
+
+  <!-- ENTER -->
+  <button id="btn-ok">Enter</button>
+
+  <div class="divider"></div>
+
+  <!-- TOTAL -->
+  <div class="total-section">
+    <div class="field-label">Total acumulado</div>
+    <div id="total-display">R$ 0,00</div>
+    <div id="items-count">0 lançamentos</div>
+  </div>
+
+  <!-- AÇÕES -->
+  <div class="actions">
+    <button id="btn-limpar">Limpar tudo</button>
+    <button id="btn-desfazer" title="Desfazer último">↩</button>
+  </div>
+
+</div>
+
+<div class="history" id="history-container">
+  <div class="history-label">Lançamentos</div>
+  <div id="history-empty">nenhum item ainda</div>
+</div>
+
+<script>
+  // ── State ──
+  let rawStr    = '';   // preço bruto
+  let qtyStr    = '1'; // quantidade bruta
+  let qty       = 1;
+  let total     = 0;
+  let historico = [];
+  let focus     = 'price'; // 'price' | 'qty'
+
+  // ── Elements ──
+  const precoEl     = document.getElementById('preco-valor');
+  const priceDisp   = document.getElementById('price-display');
+  const qtyNumEl    = document.getElementById('qty-num');
+  const qtyCursorEl = document.getElementById('qty-cursor');
+  const qtyRowEl    = document.getElementById('qty-row');
+  const totalEl     = document.getElementById('total-display');
+  const countEl     = document.getElementById('items-count');
+  const histEl      = document.getElementById('history-container');
+  const histEmpty   = document.getElementById('history-empty');
+  const commaKey    = document.querySelector('.key.comma');
+
+  // ── Focus management ──
+  function setFocus(f) {
+    focus = f;
+    if (f === 'price') {
+      priceDisp.classList.add('active');
+      qtyRowEl.classList.remove('active');
+      commaKey.classList.remove('disabled');
+    } else {
+      priceDisp.classList.remove('active');
+      qtyRowEl.classList.add('active');
+      commaKey.classList.add('disabled');
+    }
+  }
+
+  priceDisp.addEventListener('pointerdown', () => setFocus('price'));
+  qtyNumEl.addEventListener('pointerdown',  (e) => { e.stopPropagation(); setFocus('qty'); });
+
+  // ── Render preço ──
+  function renderPreco() {
+    if (rawStr === '') {
+      precoEl.innerHTML = '0<span class="cursor"></span>';
+      precoEl.classList.add('placeholder');
+    } else {
+      precoEl.innerHTML = rawStr + '<span class="cursor"></span>';
+      precoEl.classList.remove('placeholder');
+    }
+    priceDisp.classList.remove('error');
+  }
+
+  // ── Render qty ──
+  function renderQty() {
+    qtyCursorEl.remove(); // detach to avoid cloning it into textContent
+    qtyNumEl.textContent = qtyStr;
+    qtyNumEl.appendChild(qtyCursorEl);
+  }
+
+  // ── Numpad ──
+  document.getElementById('numpad').addEventListener('pointerdown', e => {
+    const key = e.target.closest('.key');
+    if (!key) return;
+
+    key.classList.add('pressed');
+    setTimeout(() => key.classList.remove('pressed'), 120);
+
+    const v = key.dataset.val;
+
+    if (focus === 'price') {
+      handlePriceKey(v);
+    } else {
+      handleQtyKey(v);
+    }
+  });
+
+  function handlePriceKey(v) {
+    if (v === 'back') {
+      rawStr = rawStr.slice(0, -1);
+    } else if (v === ',') {
+      if (!rawStr.includes(',')) {
+        rawStr = rawStr === '' ? '0,' : rawStr + ',';
+      }
+    } else {
+      const parts = rawStr.split(',');
+      if (parts[1] !== undefined && parts[1].length >= 2) return;
+      if (parts[0].length >= 6 && parts[1] === undefined) return;
+      rawStr += v;
+    }
+    renderPreco();
+  }
+
+  function handleQtyKey(v) {
+    if (v === 'back') {
+      qtyStr = qtyStr.slice(0, -1);
+      if (qtyStr === '') qtyStr = '1';
+    } else if (v === ',') {
+      return; // sem decimais na quantidade
+    } else {
+      if (qtyStr === '1' && v !== '0') qtyStr = v;        // substitui o 1 inicial
+      else if (qtyStr === '0') qtyStr = v;
+      else if (qtyStr.length >= 3) return;                 // máx 999
+      else qtyStr += v;
+    }
+    qty = Math.max(1, parseInt(qtyStr) || 1);
+    qtyStr = qty.toString();
+    renderQty();
+  }
+
+  // ── +/- buttons ──
+  document.getElementById('btn-menos').addEventListener('click', () => {
+    qty = Math.max(1, qty - 1);
+    qtyStr = qty.toString();
+    renderQty();
+  });
+
+  document.getElementById('btn-mais').addEventListener('click', () => {
+    qty = Math.min(999, qty + 1);
+    qtyStr = qty.toString();
+    renderQty();
+  });
+
+  // ── Enter ──
+  document.getElementById('btn-ok').addEventListener('click', adicionar);
+
+  function adicionar() {
+    const preco = parseFloat(rawStr.replace(',', '.')) || 0;
+    if (!preco || preco <= 0) {
+      priceDisp.classList.add('error');
+      setFocus('price');
+      return;
+    }
+
+    const sub = preco * qty;
+    total += sub;
+    historico.push({ qty, unit: preco, sub });
+
+    renderTotal();
+    addHistItem();
+
+    rawStr = ''; qtyStr = '1'; qty = 1;
+    renderPreco();
+    renderQty();
+    setFocus('price');
+  }
+
+  function fmt(v) {
+    return 'R$ ' + v.toFixed(2)
+      .replace('.', ',')
+      .replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  function renderTotal() {
+    totalEl.textContent = fmt(total);
+    totalEl.classList.remove('flash');
+    void totalEl.offsetWidth;
+    totalEl.classList.add('flash');
+    const n = historico.length;
+    countEl.textContent = n + (n === 1 ? ' lançamento' : ' lançamentos');
+  }
+
+  function addHistItem() {
+    if (histEl.contains(histEmpty)) histEmpty.remove();
+    const h = historico[historico.length - 1];
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    div.innerHTML =
+      `<span class="hi-qty">${h.qty}×</span>` +
+      `<span>${fmt(h.unit)}</span>` +
+      `<span class="hi-sub">${fmt(h.sub)}</span>`;
+    histEl.querySelector('.history-label').insertAdjacentElement('afterend', div);
+  }
+
+  // ── Desfazer ──
+  document.getElementById('btn-desfazer').addEventListener('click', () => {
+    if (!historico.length) return;
+    const last = historico.pop();
+    total = Math.max(0, total - last.sub);
+    const items = histEl.querySelectorAll('.history-item');
+    if (items.length) items[0].remove();
+    if (!historico.length) histEl.appendChild(histEmpty);
+    renderTotal();
+  });
+
+  // ── Limpar ──
+  document.getElementById('btn-limpar').addEventListener('click', () => {
+    total = 0; historico = [];
+    rawStr = ''; qtyStr = '1'; qty = 1;
+    renderPreco(); renderQty();
+    totalEl.textContent = 'R$ 0,00';
+    countEl.textContent = '0 lançamentos';
+    histEl.querySelectorAll('.history-item').forEach(el => el.remove());
+    if (!histEl.contains(histEmpty)) histEl.appendChild(histEmpty);
+    setFocus('price');
+  });
+
+  // init
+  setFocus('price');
+  renderQty();
+</script>
+</body>
+</html>
